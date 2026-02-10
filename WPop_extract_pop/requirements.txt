@@ -1,0 +1,4 @@
+rasterstats
+openhexa.sdk==2.12.1
+psycopg2-binary
+gdal==3.10.2

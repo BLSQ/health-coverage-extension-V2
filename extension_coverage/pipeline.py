@@ -14,6 +14,7 @@ from openhexa.sdk import current_run, pipeline, workspace
 from rasterio.features import rasterize
 from rasterstats import zonal_stats
 from shapely.geometry import Polygon, shape
+from health_coverage_map import DistrictHealthCoverageMap
 
 
 @pipeline("extension_coverage")
@@ -45,7 +46,7 @@ def extension_coverage():
     csi = gpd.read_file(org_unit_dir / "CSI.gpkg")
     districts = gpd.read_file(org_unit_dir / "shapes_level3.gpkg")
 
-    # Population path 
+    # Population path
     population_path = Path(workspace.files_path) / "population/population.tif"
 
     # Dirs def
@@ -60,130 +61,163 @@ def extension_coverage():
     final_path = results_dir / "final_folder"
     final_path.mkdir(parents=True, exist_ok=True)
 
-    # Get national boundaries from the merge of districts geometries 
+    # Get national boundaries from the merge of districts geometries
     # NB: Used during the atlas generation
     country = merge_districts(districts)
     country.to_file(buffer_dir / "country.gpkg", driver="GPKG")
 
-    # Write buffer areas in output directory 
+    # Write buffer areas in output directory
     (results_dir / "buffer_areas").mkdir(parents=True, exist_ok=True)
     for dist in (5, 15):
         # CSI
-        gpd.GeoDataFrame(
-            geometry=csi.buffer(dist * 1000)
-            ).dissolve().to_file(buffer_dir / f"csi_buffer_{dist}km.gpkg", driver="GPKG")
+        gpd.GeoDataFrame(geometry=csi.buffer(dist * 1000)).dissolve().to_file(
+            buffer_dir / f"csi_buffer_{dist}km.gpkg", driver="GPKG"
+        )
 
         # CS
-        gpd.GeoDataFrame(
-            geometry=cs.buffer(dist * 1000)
-            ).dissolve().to_file(buffer_dir / f"cs_buffer_{dist}km.gpkg", driver="GPKG")
+        gpd.GeoDataFrame(geometry=cs.buffer(dist * 1000)).dissolve().to_file(
+            buffer_dir / f"cs_buffer_{dist}km.gpkg", driver="GPKG"
+        )
 
     # Calculs
     current_run.log_info("Calcule la population totale par district...")
-    pop_total = count_population_total(boundaries=districts, 
-                                       population=population_path)
+    pop_total = count_population_total(boundaries=districts, population=population_path)
     districts["population_total"] = pop_total
 
     current_run.log_info("Calcule la couverture sanitaire pour chaque district...")
-    districts = calculate_population_covered(boundaries=districts,
-                                             column_population_count="population_total",
-                                             csi=csi,
-                                             population=population_path,
-                                             distances=[5000, 10000, 15000])
-    
+    districts = calculate_population_covered(
+        boundaries=districts,
+        column_population_count="population_total",
+        csi=csi,
+        population=population_path,
+        distances=[5000, 10000, 15000],
+    )
+
     districts.to_file(calculus_path / "population_coverage.gpkg", driver="GPKG", index=False)
-    pd.DataFrame(districts.drop(columns=["geometry"])
-                 ).to_csv(path_or_buf=calculus_path / "population_coverage.csv", index=False)
-    
+    pd.DataFrame(districts.drop(columns=["geometry"])).to_csv(
+        path_or_buf=calculus_path / "population_coverage.csv", index=False
+    )
+
     current_run.log_info("Génère les tiles de population pour chaque district...")
     output_tiles = results_dir / "tiles"
     output_tiles.mkdir(parents=True, exist_ok=True)
-    _ = split_population_raster(population_raster=population_path, 
-                                districts=districts, 
-                                output_dir=output_tiles)
+    _ = split_population_raster(population_raster=population_path, districts=districts, output_dir=output_tiles)
 
     current_run.log_info("Calcule la population desservie...")
     intermediate_dir.mkdir(parents=True, exist_ok=True)
     dst_file = intermediate_dir / "population_served.tif"
-    max_distance_served = 5000 
-    # mx_distance_served is a param in the older version. TODO: we would like it to be either 5, 10 or 15km. 
-    served = generate_population_served(districts=districts, 
-                                        population_dir=output_tiles, 
-                                        dst_file=dst_file, 
-                                        area_served=max_distance_served)  
-    
+    max_distance_served = 5000
+    # mx_distance_served is a param in the older version. TODO: we would like it to be either 5, 10 or 15km.
+    served = generate_population_served(
+        districts=districts, population_dir=output_tiles, dst_file=dst_file, area_served=max_distance_served
+    )
+
     current_run.log_info("Génère les zones d'extension potentielles...")
     dst_file = intermediate_dir / "priority_areas.tif"
     min_distance_from_csi = 15000
     # min_distance_from_csi is a param in the older version. TODO: we would like it to be either 5, 10 or 15km.
-    priority_areas = generate_priority_areas(population_served=served,
-                                             csi=csi,
-                                             raster_template=served,
-                                             dst_file=dst_file,
-                                             min_dist_from_csi=min_distance_from_csi)
-    
+    priority_areas = generate_priority_areas(
+        population_served=served,
+        csi=csi,
+        raster_template=served,
+        dst_file=dst_file,
+        min_dist_from_csi=min_distance_from_csi,
+    )
+
     current_run.log_info("Calcule la population desservie par chaque CSI...")
     column = f"population_{int(max_distance_served / 1000)}km"
-    csi[column] = population_served_per_fosa(fosa=csi, 
-                                             population_served_raster=served)
+    csi[column] = population_served_per_fosa(fosa=csi, population_served_raster=served)
 
     csi.to_file(calculus_path / "csi_population_served.gpkg", driver="GPKG")
-    pd.DataFrame(csi.drop(columns=["geometry"])
-                 ).to_csv(path_or_buf=calculus_path / "csi_population_served.csv", index=False)
-    
+    pd.DataFrame(csi.drop(columns=["geometry"])).to_csv(
+        path_or_buf=calculus_path / "csi_population_served.csv", index=False
+    )
+
     current_run.log_info("Calcule la population desservie par chaque CS...")
-    cs[column] = population_served_per_fosa(fosa=cs, 
-                                            population_served_raster=served)
+    cs[column] = population_served_per_fosa(fosa=cs, population_served_raster=served)
     cs.to_file(calculus_path / "cs_population_served.gpkg", driver="GPKG")
-    pd.DataFrame(cs.drop(columns=["geometry"])
-                 ).to_csv(path_or_buf=calculus_path / "cs_population_served.csv", index=False)
+    pd.DataFrame(cs.drop(columns=["geometry"])).to_csv(
+        path_or_buf=calculus_path / "cs_population_served.csv", index=False
+    )
 
     current_run.log_info("Analyse les zones potentielles d'extension...")
-    min_population = 5000 
-    # min_population is a param in the older version. TODO: we would like it to be either 5k, 6k, 7k... 
-    potential_areas = analyse_potential_areas(priority_areas=priority_areas, 
-                                              csi=csi, 
-                                              min_population=min_population)
-    
+    min_population = 5000
+    # min_population is a param in the older version. TODO: we would like it to be either 5k, 6k, 7k...
+    potential_areas = analyse_potential_areas(priority_areas=priority_areas, csi=csi, min_population=min_population)
+
     if not potential_areas.empty:
         potential_areas.to_file(calculus_path / "extension_areas.gpkg", driver="GPKG")
 
     current_run.log_info("Analyse le potentiel d'extension des CS...")
-    potential_cs = analyse_cs(cs=cs, 
-                              csi=csi, 
-                              districts=districts, 
-                              column=column)
+    potential_cs = analyse_cs(cs=cs, csi=csi, districts=districts, column=column)
 
     potential_cs.to_file(calculus_path / "cs_extension_potential.gpkg", driver="GPKG")
-    pd.DataFrame(potential_cs.drop(columns=["geometry"])
-                 ).to_csv(calculus_path / "cs_extension_potential.csv", index=False)
+    pd.DataFrame(potential_cs.drop(columns=["geometry"])).to_csv(
+        calculus_path / "cs_extension_potential.csv", index=False
+    )
 
     current_run.log_info("Modélisation terminée ! Préparation du dossier contenant les fichiers de sortie... ")
 
-    # Parse and zip all files according to the district
-    files_paths = get_files_paths(dirs_path=[buffer_dir, calculus_path], 
-                                  files_path=[results_dir / "healthcoverage_atlas.qgz"])
+    # Parse all files according to the district
+    files_paths = get_files_paths(
+        dirs_path=[buffer_dir, calculus_path], files_path=[results_dir / "healthcoverage_atlas.qgz"]
+    )
 
-    _ = split_files_by_district(file_paths=files_paths,
-                                districts=districts,
-                                district_col="level_3_name", 
-                                output_dir=final_path / "unzip")
-    
-    _ = zip_folder(dir_path=final_path / "unzip", 
-                   output_dir=final_path / "zip")
+    unzip_folders = final_path / "unzip"
+    _ = split_files_by_district(
+        file_paths=files_paths, districts=districts, district_col="level_3_name", output_dir=unzip_folders
+    )
 
-    # Upload to s3 bucket to make zip accessible through the interface cartesanitaireniger.org
-    _ = upload_to_s3(folder_path=final_path / "zip")
+    # Generate pdf atlas
+    current_run.log_info("Génère le PDF atlas pour chaque district...")
+
+    # Parcours des dossiers de district
+    for district_folder in unzip_folders.iterdir():
+        if not district_folder.is_dir():
+            continue
+
+        district_name = district_folder.name
+        current_run.log_info(f"Traitement du district : {district_name}")
+
+        # Chemins des fichiers nécessaires
+        population_coverage_gpkg = district_folder / "population_coverage.gpkg"
+        cs_population_served_gpkg = district_folder / "cs_population_served.gpkg"
+        csi_population_served_gpkg = district_folder / "csi_population_served.gpkg"
+        cs_extension_potential_gpkg = district_folder / "cs_extension_potential.gpkg"
+        buffer_dir = district_folder / "buffer_areas"
+        country_gpkg = buffer_dir / "country.gpkg"
+
+        # Instanciation de la classe
+        district_map = DistrictHealthCoverageMap(output_dir=district_folder)
+
+        # Génération du PDF
+        pdf_path = district_map.generate(
+            population_coverage=population_coverage_gpkg,
+            csi_population_served=csi_population_served_gpkg,
+            cs_population_served=cs_population_served_gpkg,
+            cs_extension_potential=cs_extension_potential_gpkg,
+            csi_buffer_5km=buffer_dir / "csi_buffer_5km.gpkg",
+            csi_buffer_15km=buffer_dir / "csi_buffer_15km.gpkg",
+            extension_areas=cs_extension_potential_gpkg,
+            country=country_gpkg,
+        )
+
+        current_run.log_info(f"PDF généré pour {district_name} : {pdf_path.name}")
+
+
+    # Zip and upload to s3 bucket to make docs accessible through the interface cartesanitaireniger.org
+    # _ = zip_folder(dir_path=unzip_folders, output_dir=final_path / "zip")
+    # _ = upload_to_s3(folder_path=final_path / "zip")
 
 
 def merge_districts(df_shapes: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Merge all geometries of districts to get national boundaries.
-    
+
     Parameter
     ---------
     df_shapes: gpd.GeoDataFrame
         GeoDatFrame with valid geometries
-        
+
     Returns
     -------
     gpd.GeoDataFrame
@@ -210,7 +244,6 @@ def count_population_total(boundaries: gpd.GeoDataFrame, population: Path) -> pd
         Population count per district/area.
     """
     with rasterio.open(str(population)) as src:
-
         stats = zonal_stats(
             raster=src.read(1),
             vectors=boundaries.geometry,
@@ -224,11 +257,13 @@ def count_population_total(boundaries: gpd.GeoDataFrame, population: Path) -> pd
         return pd.Series(data=pop_count, index=boundaries.index)
 
 
-def calculate_population_covered(boundaries: gpd.GeoDataFrame, 
-                                 column_population_count: str, 
-                                 csi: gpd.GeoDataFrame,
-                                 population: Path, 
-                                 distances: list[int] | None) -> pd.DataFrame:
+def calculate_population_covered(
+    boundaries: gpd.GeoDataFrame,
+    column_population_count: str,
+    csi: gpd.GeoDataFrame,
+    population: Path,
+    distances: list[int] | None,
+) -> pd.DataFrame:
     """Compute population covered for each district.
 
     Parameters
@@ -253,31 +288,30 @@ def calculate_population_covered(boundaries: gpd.GeoDataFrame,
         distances = [5000, 10000, 15000]
 
     with rasterio.open(str(population)) as src:
-
         pop = src.read(1)
         coverage = boundaries.copy()
 
         for distance in distances:
             data = []
             covered = csi.buffer(distance).union_all()
-            
-            for _, row in coverage.iterrows():
 
+            for _, row in coverage.iterrows():
                 covered_district = covered.intersection(row.geometry)
 
                 if covered_district.area == 0 or not covered_district.is_valid:
                     data.append(0)
                     continue
 
-                area_covered = rasterize([covered_district.__geo_interface__],
-                                         out_shape=pop.shape,
-                                         fill=0,
-                                         default_value=1,
-                                         dtype="uint8",
-                                         transform=src.transform,
-                                         all_touched=True
-                                         )
-                
+                area_covered = rasterize(
+                    [covered_district.__geo_interface__],
+                    out_shape=pop.shape,
+                    fill=0,
+                    default_value=1,
+                    dtype="uint8",
+                    transform=src.transform,
+                    all_touched=True,
+                )
+
                 pop_covered = pop[(area_covered == 1) & (pop != src.nodata)].sum()
                 data.append(pop_covered)
 
@@ -289,9 +323,7 @@ def calculate_population_covered(boundaries: gpd.GeoDataFrame,
     return coverage
 
 
-def split_population_raster(population_raster: Path, 
-                            districts: gpd.GeoDataFrame, 
-                            output_dir: Path) -> None:
+def split_population_raster(population_raster: Path, districts: gpd.GeoDataFrame, output_dir: Path) -> None:
     """Split population raster per district.
 
     The function split the input population raster into multiple tiles (one per district). This is to avoid
@@ -310,7 +342,6 @@ def split_population_raster(population_raster: Path,
         raise ValueError(f"Population raster not found at {population_raster.as_posix()}")
 
     with rasterio.open(str(population_raster)) as src:
-
         # Reproject districts geodataframe if needed
         districts_ = districts.copy()
         if districts_.crs != src.crs:
@@ -321,13 +352,10 @@ def split_population_raster(population_raster: Path,
         dst_profile["predictor"] = 3
 
         for index, district in districts_.iterrows():
-
             fp = output_dir / f"{index}.tif"
 
             # Read a window of the population raster based on the district geometry.
-            window = rasterio.mask.geometry_window(
-                src, shapes=[district.geometry.__geo_interface__]
-            )
+            window = rasterio.mask.geometry_window(src, shapes=[district.geometry.__geo_interface__])
             transform = src.window_transform(window)
             population = src.read(1, window=window)
 
@@ -386,7 +414,6 @@ def get_kernel(population_raster: Path, buffer_size: int) -> np.ndarray:
         Buffer kernel as a numpy array.
     """
     with rasterio.open(str(population_raster)) as src:
-
         if src.crs.is_geographic:
             raise ValueError("Population raster must be in a projected CRS (meters).")
 
@@ -394,27 +421,19 @@ def get_kernel(population_raster: Path, buffer_size: int) -> np.ndarray:
         geom = extent.centroid.buffer(buffer_size)
 
         # Rasterize the buffer and use it as a 2d array kernel
-        crop, crop_transform = rasterio.mask.mask(src, 
-                                                  shapes=[geom], 
-                                                  crop=True, 
-                                                  indexes=1)
-        kernel = rasterio.mask.geometry_mask([geom], 
-                                             out_shape=crop.shape, 
-                                             transform=crop_transform, 
-                                             invert=True)
+        crop, crop_transform = rasterio.mask.mask(src, shapes=[geom], crop=True, indexes=1)
+        kernel = rasterio.mask.geometry_mask([geom], out_shape=crop.shape, transform=crop_transform, invert=True)
 
     return kernel.astype("uint8")
 
 
-def compute_population_served(population_raster: Path, 
-                              area_served: int, 
-                              geom: Polygon) -> np.ndarray:
+def compute_population_served(population_raster: Path, area_served: int, geom: Polygon) -> np.ndarray:
     """Create a raster with population served per pixel.
 
     In the population served raster, each pixel is assigned the value corresponding to the total population count in
     a radius of `area_served` meters.
 
-    More specifically, each pixel is assigned the value corresponding to the sum of all its neighboring pixels 
+    More specifically, each pixel is assigned the value corresponding to the sum of all its neighboring pixels
     -- constrained by a disk-shaped footprint defined by the buffer area.
 
     Parameters
@@ -437,12 +456,13 @@ def compute_population_served(population_raster: Path,
         pop = src.read(1)
         pop[pop < 0] = 0
         pop[pop == src.nodata] = 0
-        district = rasterio.mask.geometry_mask(geometries=[geom.__geo_interface__],
-                                               out_shape=pop.shape,
-                                               transform=src.transform,
-                                               all_touched=True,
-                                               invert=True
-                                               )
+        district = rasterio.mask.geometry_mask(
+            geometries=[geom.__geo_interface__],
+            out_shape=pop.shape,
+            transform=src.transform,
+            all_touched=True,
+            invert=True,
+        )
         pop[~district] = 0
 
     pop_sum = cv2.filter2D(src=pop, ddepth=-1, kernel=kernel).astype("int32")
@@ -450,16 +470,15 @@ def compute_population_served(population_raster: Path,
     return pop_sum
 
 
-def generate_population_served(districts: gpd.GeoDataFrame, 
-                               population_dir: Path, 
-                               dst_file: Path, 
-                               area_served: int) -> Path:
+def generate_population_served(
+    districts: gpd.GeoDataFrame, population_dir: Path, dst_file: Path, area_served: int
+) -> Path:
     """Compute population served per pixel.
 
     In the population served raster, each pixel is assigned the value corresponding to the total population count in
     a radius of `area_served` meters.
 
-    More specifically, each pixel is assigned the value corresponding to the sum of all its neighboring pixels -- 
+    More specifically, each pixel is assigned the value corresponding to the sum of all its neighboring pixels --
     constrained by a disk-shaped footprint defined by the buffer area.
 
     Parameters
@@ -488,17 +507,13 @@ def generate_population_served(districts: gpd.GeoDataFrame,
 
     # Compute population served for each population raster tile, i.e. once per district
     for index, district in districts.iterrows():
-
         fp = population_dir / f"{index}_served.tif"
         population_raster = population_dir / f"{index}.tif"
 
         with rasterio.open(str(population_raster)) as src:
             dst_profile = src.profile.copy()
 
-        pop_sum = compute_population_served(population_raster, 
-                                            area_served, 
-                                            district.geometry
-                                            )
+        pop_sum = compute_population_served(population_raster, area_served, district.geometry)
 
         dst_profile["dtype"] = "int32"
         dst_profile["nodata"] = -1
@@ -514,13 +529,16 @@ def generate_population_served(districts: gpd.GeoDataFrame,
         meta = src.meta.copy()
 
     data, dst_transform = rasterio.merge.merge(tiles_str)
-    meta.update({"driver": "GTiff",
-                    "count": data.shape[0],
-                    "height": data.shape[1],
-                    "width": data.shape[2],
-                    "transform": dst_transform,
-                    "BIGTIFF": "YES",
-                    })
+    meta.update(
+        {
+            "driver": "GTiff",
+            "count": data.shape[0],
+            "height": data.shape[1],
+            "width": data.shape[2],
+            "transform": dst_transform,
+            "BIGTIFF": "YES",
+        }
+    )
 
     with rasterio.open(dst_file, "w", **meta) as dst:
         dst.write(data)
@@ -528,10 +546,8 @@ def generate_population_served(districts: gpd.GeoDataFrame,
     return dst_file
 
 
-# For generate_priority_areas 
-def already_served(fosa: gpd.GeoDataFrame, 
-                   min_distance: int, 
-                   raster_template: Path) -> np.ndarray:
+# For generate_priority_areas
+def already_served(fosa: gpd.GeoDataFrame, min_distance: int, raster_template: Path) -> np.ndarray:
     """Create a mask with areas already served by an existing CSI.
 
     Parameters
@@ -552,18 +568,21 @@ def already_served(fosa: gpd.GeoDataFrame,
         transform = src.transform
         width, height = src.width, src.height
 
-    return rasterio.features.geometry_mask(geometries=[geom.__geo_interface__ for geom in fosa.buffer(min_distance)],
-                                           out_shape=(height, width),
-                                           transform=transform,
-                                           invert=True
-                                           )
+    return rasterio.features.geometry_mask(
+        geometries=[geom.__geo_interface__ for geom in fosa.buffer(min_distance)],
+        out_shape=(height, width),
+        transform=transform,
+        invert=True,
+    )
 
 
-def generate_priority_areas(population_served: Path, 
-                            csi: gpd.GeoDataFrame, 
-                            raster_template: Path, 
-                            dst_file: Path,
-                            min_dist_from_csi: int = 15000) -> Path:
+def generate_priority_areas(
+    population_served: Path,
+    csi: gpd.GeoDataFrame,
+    raster_template: Path,
+    dst_file: Path,
+    min_dist_from_csi: int = 15000,
+) -> Path:
     """Compute a raster showing priority areas.
 
     Priority areas are locations at more than <buffer_size> of an existing CSI and with more than <population_threshold>
@@ -591,18 +610,15 @@ def generate_priority_areas(population_served: Path,
         priority_areas = src.read(1)
         dst_profile = src.profile.copy()
 
-    served_by_csi = already_served(fosa=csi,
-                                   min_distance=min_dist_from_csi,
-                                   raster_template=raster_template)
-    
+    served_by_csi = already_served(fosa=csi, min_distance=min_dist_from_csi, raster_template=raster_template)
+
     priority_areas[served_by_csi == 1] = -1
     with rasterio.open(str(dst_file), "w", **dst_profile) as dst:
         dst.write(priority_areas, 1)
     return dst_file
 
 
-def population_served_per_fosa(fosa: gpd.GeoDataFrame, 
-                               population_served_raster: Path) -> pd.Series:
+def population_served_per_fosa(fosa: gpd.GeoDataFrame, population_served_raster: Path) -> pd.Series:
     """Get population served for each FOSA per district.
 
     Parameters
@@ -630,9 +646,7 @@ def population_served_per_fosa(fosa: gpd.GeoDataFrame,
         fosa_ = fosa.copy()
 
     for index, fs in fosa_.iterrows():
-
         if fs.geometry:
-
             row, col = rasterio.transform.rowcol(src_transform, fs.geometry.x, fs.geometry.y)
 
             try:
@@ -646,9 +660,9 @@ def population_served_per_fosa(fosa: gpd.GeoDataFrame,
     return fosa_pop_served
 
 
-def analyse_potential_areas(priority_areas: Path, 
-                            csi: gpd.GeoDataFrame, 
-                            min_population: int = 5000) -> gpd.GeoDataFrame:
+def analyse_potential_areas(
+    priority_areas: Path, csi: gpd.GeoDataFrame, min_population: int = 5000
+) -> gpd.GeoDataFrame:
     """Analyse potential areas for extension.
 
     Parameters
@@ -687,11 +701,8 @@ def analyse_potential_areas(priority_areas: Path,
     potential_areas = potential_areas[potential_areas["area"] >= 1]
 
     # Get maximum population served in polygon
-    stats = zonal_stats([geom for geom in potential_areas.geometry],
-                        raster=str(priority_areas),
-                        stats=["max"]
-                        )
-    
+    stats = zonal_stats([geom for geom in potential_areas.geometry], raster=str(priority_areas), stats=["max"])
+
     potential_areas["max_population_served"] = [int(s["max"]) for s in stats]
     distance_csi = []
     csi = csi[csi.geometry.is_valid]
@@ -704,10 +715,9 @@ def analyse_potential_areas(priority_areas: Path,
     return potential_areas
 
 
-def analyse_cs(cs: gpd.GeoDataFrame, 
-               csi: gpd.GeoDataFrame, 
-               districts: gpd.GeoDataFrame, 
-               column: str) -> gpd.GeoDataFrame:
+def analyse_cs(
+    cs: gpd.GeoDataFrame, csi: gpd.GeoDataFrame, districts: gpd.GeoDataFrame, column: str
+) -> gpd.GeoDataFrame:
     """Analyse cases de santé for extension.
 
     Parameters
@@ -720,7 +730,7 @@ def analyse_cs(cs: gpd.GeoDataFrame,
         Districts.
     column : str
         "population_{int(max_distance_served / 1000)}km"
-    
+
     Returns
     -------
     geodataframe
@@ -738,7 +748,6 @@ def analyse_cs(cs: gpd.GeoDataFrame,
     cs_ = cs[cs.distance_nearest_csi >= 15].copy()
 
     def _get_pop_in_district(geom: Polygon, districts: gpd.GeoDataFrame) -> float:
-
         districts_ = districts[districts.contains(geom)]
         if len(districts_) == 0:
             return 0
@@ -771,7 +780,7 @@ def get_files_paths(dirs_path: list[Path], files_path: list[Path]) -> list[Path]
     for directory in dirs_path:
         if not directory.exists() or not directory.is_dir():
             continue
-        
+
         collected_files.extend(p for p in directory.iterdir() if p.is_file())
 
     # Add explicitly provided files
@@ -782,10 +791,9 @@ def get_files_paths(dirs_path: list[Path], files_path: list[Path]) -> list[Path]
     return collected_files
 
 
-def split_files_by_district(file_paths: list[Path],
-                            districts: pd.DataFrame,
-                            district_col: str,
-                            output_dir: Path) -> None:
+def split_files_by_district(
+    file_paths: list[Path], districts: pd.DataFrame, district_col: str, output_dir: Path
+) -> None:
     """Split files by district and save copies filtered by district value.
 
     Parameters
@@ -804,47 +812,47 @@ def split_files_by_district(file_paths: list[Path],
     for district in districts[district_col].unique():
         district_folder = output_dir / str(district)
         district_folder.mkdir(exist_ok=True)
-        
+
         # Remove existing folder if it exists
         if district_folder.exists():
             shutil.rmtree(district_folder)
         district_folder.mkdir()
 
-        # Subfolder for buffer geom 
+        # Subfolder for buffer geom
         buffer_folder = district_folder / "buffer_areas"
         buffer_folder.mkdir()
 
         for fpath in file_paths:
             ext = fpath.suffix.lower()
-            
+
             # CSV
             if ext == ".csv":
                 df = pd.read_csv(fpath)
-                
+
                 if district_col in df.columns:
                     df_filtered = df[df[district_col] == district]
                 else:
                     df_filtered = df.copy()
                 df_filtered.to_csv(district_folder / fpath.name, index=False)
-            
+
             # GeoPackage
             elif ext == ".gpkg":
                 gdf = gpd.read_file(fpath)
-                
+
                 if district_col in gdf.columns:
                     gdf_filtered = gdf[gdf[district_col] == district]
                 else:
                     gdf_filtered = gdf.copy()
-                    
+
                 if "_buffer_" in fpath.name:
                     gdf_filtered.to_file(buffer_folder / fpath.name, driver="GPKG")
-                else:  
+                else:
                     gdf_filtered.to_file(district_folder / fpath.name, driver="GPKG")
-            
+
             # QGIS project (qgz) -> just copy, no filter
             elif ext == ".qgz":
                 shutil.copy(fpath, district_folder / fpath.name)
-            
+
             else:
                 print(f"Skipping unsupported file type: {fpath}")
 
@@ -898,7 +906,6 @@ def upload_to_s3(folder_path: str, region: str = "eu-central-1") -> None:
     )
 
     for zip_folder in folder_path.iterdir():
-
         destination = f"health_cov_modelling/distance/full_modelling/{zip_folder.name}"
         s3_path = f"s3://{s3_connection.bucket_name}/{destination}"
 

@@ -10,11 +10,11 @@ import pandas as pd
 import rasterio
 import rasterio.mask
 import rasterio.merge
+from health_coverage_map import DistrictHealthCoverageMap
 from openhexa.sdk import current_run, pipeline, workspace
 from rasterio.features import rasterize
 from rasterstats import zonal_stats
 from shapely.geometry import Polygon, shape
-from health_coverage_map import DistrictHealthCoverageMap
 
 
 @pipeline("extension_coverage")
@@ -179,35 +179,33 @@ def extension_coverage():
         district_name = district_folder.name
         current_run.log_info(f"Traitement du district : {district_name}")
 
-        # Chemins des fichiers nécessaires
-        population_coverage_gpkg = district_folder / "population_coverage.gpkg"
-        cs_population_served_gpkg = district_folder / "cs_population_served.gpkg"
-        csi_population_served_gpkg = district_folder / "csi_population_served.gpkg"
-        cs_extension_potential_gpkg = district_folder / "cs_extension_potential.gpkg"
+        population_coverage = gpd.read_file(district_folder / "population_coverage.gpkg")
+        cs_population_served = gpd.read_file(district_folder / "cs_population_served.gpkg")
+        csi_population_served = gpd.read_file(district_folder / "csi_population_served.gpkg")
+        cs_extension_potential = gpd.read_file(district_folder / "cs_extension_potential.gpkg")
+        extension_areas = gpd.read_file(district_folder / "extension_areas.gpkg")
+        country_gpkg = gpd.read_file(district_folder / "country.gpkg")
         buffer_dir = district_folder / "buffer_areas"
-        country_gpkg = buffer_dir / "country.gpkg"
+        csi_buffer_5km = gpd.read_file(buffer_dir / "csi_buffer_5km.gpkg")
+        csi_buffer_15km = gpd.read_file(buffer_dir / "csi_buffer_15km.gpkg")
 
-        # Instanciation de la classe
-        district_map = DistrictHealthCoverageMap(output_dir=district_folder)
+        district_map = DistrictHealthCoverageMap(output_dir=district_folder,
+                                                 population_coverage=population_coverage,
+                                                 csi_population_served=csi_population_served,
+                                                 cs_population_served=cs_population_served,
+                                                 cs_extension_potential=cs_extension_potential,
+                                                 extension_areas=extension_areas,
+                                                 csi_buffer_5km=csi_buffer_5km,
+                                                 csi_buffer_15km=csi_buffer_15km,
+                                                 country=country_gpkg)
 
-        # Génération du PDF
-        pdf_path = district_map.generate(
-            population_coverage=population_coverage_gpkg,
-            csi_population_served=csi_population_served_gpkg,
-            cs_population_served=cs_population_served_gpkg,
-            cs_extension_potential=cs_extension_potential_gpkg,
-            csi_buffer_5km=buffer_dir / "csi_buffer_5km.gpkg",
-            csi_buffer_15km=buffer_dir / "csi_buffer_15km.gpkg",
-            extension_areas=cs_extension_potential_gpkg,
-            country=country_gpkg,
-        )
+        pdf_path = district_map.generate()
 
         current_run.log_info(f"PDF généré pour {district_name} : {pdf_path.name}")
 
-
     # Zip and upload to s3 bucket to make docs accessible through the interface cartesanitaireniger.org
-    # _ = zip_folder(dir_path=unzip_folders, output_dir=final_path / "zip")
-    # _ = upload_to_s3(folder_path=final_path / "zip")
+    _ = zip_folder(dir_path=unzip_folders, output_dir=final_path / "zip")
+    _ = upload_to_s3(folder_path=final_path / "zip")
 
 
 def merge_districts(df_shapes: gpd.GeoDataFrame) -> gpd.GeoDataFrame:

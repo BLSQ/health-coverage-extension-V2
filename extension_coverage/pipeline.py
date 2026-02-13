@@ -177,7 +177,6 @@ def extension_coverage():
             continue
 
         district_name = district_folder.name
-        current_run.log_info(f"Traitement du district : {district_name}")
 
         population_coverage = gpd.read_file(district_folder / "population_coverage.gpkg")
         cs_population_served = gpd.read_file(district_folder / "cs_population_served.gpkg")

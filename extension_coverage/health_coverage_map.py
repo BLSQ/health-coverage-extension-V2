@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +17,31 @@ from shapely.geometry import box
 
 @dataclass
 class BaseHealthCoverageMap:
+    """Base class for generating health coverage maps and associated summary outputs.
+
+    Attributes
+    ----------
+    output_dir : Path
+        Directory where generated pdf will be saved.
+    population_coverage : GeoDataFrame
+        Spatial extent representing the population coverage area used as main map boundary.
+    csi_population_served : GeoDataFrame
+        Locations of CSI facilities and associated served population.
+    cs_population_served : GeoDataFrame
+        Locations of CS facilities and associated served population.
+    cs_extension_potential : GeoDataFrame
+        Candidate CS locations likely to be converted into CSI.
+    csi_buffer_5km : GeoDataFrame
+        5 km service coverage buffers around CSI facilities.
+    csi_buffer_15km : GeoDataFrame
+        15 km service coverage buffers around CSI facilities.
+    extension_areas : GeoDataFrame
+        Areas identified as potential zones for new CSI implementation.
+    country : GeoDataFrame
+        Country boundary used for masking.
+    table_is_empty : bool, optional
+        Indicator used for layout and formatting when no extension candidates exist.
+    """
 
     output_dir: Path
     population_coverage: gpd.GeoDataFrame
@@ -107,6 +133,22 @@ class BaseHealthCoverageMap:
         outside_popcov = gpd.overlay(country_gdf, popcov_gdf, how="difference")
 
         return outside_country, outside_popcov
+    
+    def add_basemap_with_retry(self, ax: Axes, retries: int = 5, wait: float = 1) -> bool:
+        """Add basemap from OSM with multiple tries if connection fails.
+        
+        Returns
+        -------
+        bool
+        """
+        for attempt in range(retries):
+            try:
+                ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik)
+                return True
+            except Exception as e:
+                print(f"Tentative {attempt + 1}/{retries} failed : {e}")
+                time.sleep(wait)
+        return False
 
     def export_pdf(self, fig: Figure, filename: str = "health_coverage_map.pdf") -> Path:
         """Export figure as pdf.
@@ -124,6 +166,7 @@ class BaseHealthCoverageMap:
 
 @dataclass
 class DistrictHealthCoverageMap(BaseHealthCoverageMap):
+    """District-level implementation for generating health coverage maps."""
 
     def generate(self) -> Path:
         """Generate a pdf file for given data.
@@ -134,7 +177,6 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
             Path to the generated pdf.
         """
         self.clip_datasets_to_population()
-        
         table, self.table_is_empty = self.prepare_extension_table()
 
         fig, ax_map, ax_table = self.create_figure_layout()
@@ -155,21 +197,23 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
         ax.set_ylim(miny - pad_y, maxy + pad_y)
 
         self.population_coverage.plot(ax=ax, alpha=0)
-        ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik)
+        self.add_basemap_with_retry(ax)
+        # ctx.add_basemap(ax, source=ctx.providers.OpenStreetMap.Mapnik)
 
         # buffers
         self.csi_buffer_15km.plot(ax=ax, color="#b2df8a", alpha=0.25, edgecolor="#33a02c")
         self.csi_buffer_5km.plot(ax=ax, color="#b2df8a", alpha=0.25, edgecolor="#33a02c")
 
         # extension areas
-        self.extension_areas.plot(ax=ax, color="#ff0004", edgecolor="#a4181a")
-        for x, y, pop in zip(self.extension_areas.geometry.centroid.x,
-                             self.extension_areas.geometry.centroid.y,
-                             self.extension_areas.max_population_served, 
-                             strict=False):
-            label = f"+{pop}"
-            text = ax.annotate(label, xy=(x, y), fontsize=9, color="#610023")
-            text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
+        if not self.extension_areas.empty:
+            self.extension_areas.plot(ax=ax, color="#ff0004", edgecolor="#a4181a")
+            for x, y, pop in zip(self.extension_areas.geometry.centroid.x,
+                                self.extension_areas.geometry.centroid.y,
+                                self.extension_areas.max_population_served, 
+                                strict=False):
+                label = f"+{pop}"
+                text = ax.annotate(label, xy=(x, y), fontsize=9, color="#610023")
+                text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
 
         # points
         self.csi_population_served.plot(ax=ax, color="#cc0000", markersize=50, edgecolor="#000000")
@@ -180,18 +224,20 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
             text = ax.annotate(label, xy=(x, y), xytext=(3, 3), textcoords="offset points", fontsize=9, weight="bold")
             text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
 
-        self.cs_population_served.plot(ax=ax, color="#0077fe", markersize=50, edgecolor="#000000")
+        if not self.cs_population_served.empty:  # like the case for Niamey & Maradi Ville
+            self.cs_population_served.plot(ax=ax, color="#0077fe", markersize=50, edgecolor="#000000")
 
-        self.cs_extension_potential.plot(ax=ax, color="#54b252", markersize=50, edgecolor="#000000")
-        for x, y, name, pop in zip(self.cs_extension_potential.geometry.x, 
-                                   self.cs_extension_potential.geometry.y,
-                                   self.cs_extension_potential.name, 
-                                   self.cs_extension_potential.population_5km, 
-                                   strict=False):
-            label = f"{name}\n+{int(pop)}"
-            text = ax.annotate(label, xy=(x, y), xytext=(-3, -3), textcoords="offset points", 
-                               fontsize=9, ha="right", va="top")
-            text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
+        if not self.table_is_empty:
+            self.cs_extension_potential.plot(ax=ax, color="#54b252", markersize=50, edgecolor="#000000")
+            for x, y, name, pop in zip(self.cs_extension_potential.geometry.x, 
+                                    self.cs_extension_potential.geometry.y,
+                                    self.cs_extension_potential.name, 
+                                    self.cs_extension_potential.population_5km, 
+                                    strict=False):
+                label = f"{name}\n+{int(pop)}"
+                text = ax.annotate(label, xy=(x, y), xytext=(-3, -3), textcoords="offset points", 
+                                fontsize=9, ha="right", va="top")
+                text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
 
         # contours
         self.country.boundary.plot(ax=ax, color="black", linewidth=1)
@@ -202,7 +248,7 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
         
         ax.set_title(f"{self.population_coverage.level_3_name[0]}, {self.population_coverage.level_2_name[0]}", 
                      fontsize=20, fontweight="bold", pad=90)
-        ax.text(0.5, 1.1, f"Population calculée : {int(self.population_coverage.population_total)}", 
+        ax.text(0.5, 1.1, f"Population calculée : {int(self.population_coverage.population_total.iloc[0])}", 
                 transform=ax.transAxes, ha="center", va="bottom", fontsize=15)
         ax.axis("off")
 

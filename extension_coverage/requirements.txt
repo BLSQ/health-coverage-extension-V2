@@ -1,2 +1,4 @@
 fsspec
 opencv-python
+contextily
+matplotlib_scalebar

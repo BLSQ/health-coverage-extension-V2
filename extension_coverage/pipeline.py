@@ -46,9 +46,6 @@ def extension_coverage():
     geo_dir = results_dir / "geo"
     geo_dir.mkdir(parents=True, exist_ok=True)
 
-    regions_dir = results_dir / "regions"
-    districts_dir = results_dir / "districts"
-
     # Prepare geospatial stuff
     regions = geo.merge_districts(df_shapes=districts, output_dir=geo_dir)
 
@@ -56,55 +53,93 @@ def extension_coverage():
     geo.save_buffered_geom(output_dir=geo_dir, health_facilities=cs, name="cs", buffers=config.buffers)
 
     # Modelling
-    region = Modelling(
-        output_dir=regions_dir,
+    process_level_modelling(
         boundaries=regions,
+        geo_dir=geo_dir,
         population=population_path,
         csi=csi,
         cs=cs,
+        output_dir=results_dir,
         level="region",
     )
-
-    region.population_computing()
-    region.extension_computing()
-
-    district = Modelling(
-        output_dir=districts_dir,
+    process_level_modelling(
         boundaries=districts,
+        geo_dir=geo_dir,
         population=population_path,
         csi=csi,
         cs=cs,
+        output_dir=results_dir,
         level="district",
     )
 
-    district.population_computing()
-    district.extension_computing()
 
-    current_run.log_info("Modélisation terminée ! Préparation du dossier contenant les fichiers de sortie... ")
+def process_level_modelling(
+    boundaries: gpd.GeoDataFrame,
+    geo_dir: Path,
+    population: Path,
+    csi: gpd.GeoDataFrame,
+    cs: gpd.GeoDataFrame,
+    output_dir: Path,
+    level: str,
+):
+    """Run the full health coverage modelling pipeline for a given administrative level.
 
-    region = PrepareOutputs(
-        input_dir=regions_dir / "calculs",
-        geo_dir=geo_dir,
-        output_dir=regions_dir / "final",
-        boundaries=regions,
-        level="region",
+    This function orchestrates the complete workflow for one administrative level:
+    1. Initializes and executes the modelling computations (population and extension).
+    2. Prepares and restructures the output files.
+    3. Splits results, generate folders and upload them to a s3 bucket.
+
+    Parameters
+    ----------
+    boundaries : gpd.GeoDataFrame
+        Administrative boundaries for the selected level.
+    geo_dir : Path
+        Directory containing reference geographic files used during output preparation.
+    population : Path
+        Path to the population raster file.
+    csi : gpd.GeoDataFrame
+        GeoDataFrame containing CSI health facility locations.
+    cs : gpd.GeoDataFrame
+        GeoDataFrame containing CS health facility locations.
+    output_dir : Path
+        Root directory where level-specific outputs will be stored.
+    level : str
+        Administrative level identifier (e.g., "region", "district").
+
+    Notes
+    -----
+    This function acts as a high-level orchestrator and delegates computation and output generation to the `Modelling`
+    and `PrepareOutputs` classes.
+    """
+    dst_dir = output_dir / level
+
+    model = Modelling(
+        output_dir=dst_dir,
+        boundaries=boundaries,
+        population=population,
+        csi=csi,
+        cs=cs,
+        level=level,
     )
 
-    region.split_files()
-    # region.generate_pdf()
-    region.generate_upload_folders()
+    model.population_computing()
+    model.extension_computing()
 
-    district = PrepareOutputs(
-        input_dir=regions_dir / "calculs",
-        geo_dir=geo_dir,
-        output_dir=regions_dir / "final",
-        boundaries=regions,
-        level="district",
+    current_run.log_info(
+        f"Modélisation terminée au niveau {level}! Préparation du dossier contenant les fichiers de sortie... "
     )
 
-    district.split_files()
-    district.generate_pdf()
-    district.generate_upload_folders()
+    outputs = PrepareOutputs(
+        input_dir=dst_dir / "calculs",
+        geo_dir=geo_dir,
+        output_dir=dst_dir / "final",
+        boundaries=boundaries,
+        level=level,
+    )
+
+    outputs.split_files()
+    # boundaries.generate_pdf()
+    # boundaries.generate_upload_folders()
 
 
 if __name__ == "__main__":

@@ -435,33 +435,9 @@ class RegionHealthCoverageMap(BaseHealthCoverageMap):
                 text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
 
         # points
-        self.csi_population_served.plot(ax=ax, color="#cc0000", markersize=50, edgecolor="#000000")
-        for x, y, label in zip(
-            self.csi_population_served.geometry.x,
-            self.csi_population_served.geometry.y,
-            self.csi_population_served.name,
-            strict=False,
-        ):
-            text = ax.annotate(label, xy=(x, y), xytext=(3, 3), textcoords="offset points", fontsize=9, weight="bold")
-            text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
-
-        if not self.cs_population_served.empty:  # like the case for Niamey & Maradi Ville
-            self.cs_population_served.plot(ax=ax, color="#0077fe", markersize=50, edgecolor="#000000")
-
         if not self.table_is_empty:
             self.cs_extension_potential.plot(ax=ax, color="#54b252", markersize=50, edgecolor="#000000")
-            for x, y, name, pop in zip(
-                self.cs_extension_potential.geometry.x,
-                self.cs_extension_potential.geometry.y,
-                self.cs_extension_potential.name,
-                self.cs_extension_potential.population_5km,
-                strict=False,
-            ):
-                label = f"{name}\n+{int(pop)}"
-                text = ax.annotate(
-                    label, xy=(x, y), xytext=(-3, -3), textcoords="offset points", fontsize=9, ha="right", va="top"
-                )
-                text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
+        self.csi_population_served.plot(ax=ax, color="#cc0000", markersize=50, edgecolor="#000000")
 
         ax.set_title(
             f"{self.population_coverage.level_2_name[0]}",
@@ -506,17 +482,6 @@ class RegionHealthCoverageMap(BaseHealthCoverageMap):
                 ls="",
                 markeredgecolor="#000000",
                 label="CS (impact élevé)",
-            ),
-            Line2D(
-                [0],
-                [0],
-                marker="o",
-                color="#cc0000",
-                markerfacecolor="#0077fe",
-                markersize=7,
-                ls="",
-                markeredgecolor="#000000",
-                label="CS (impact faible)",
             ),
         ]
         ax.legend(handles=legend_elements, loc="best", fontsize=8, frameon=True)

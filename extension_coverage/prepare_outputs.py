@@ -3,7 +3,7 @@ from pathlib import Path
 
 import geopandas as gpd
 import utils.outputs_dealing as od
-from health_coverage_map import DistrictHealthCoverageMap
+from health_coverage_map import DistrictHealthCoverageMap, RegionHealthCoverageMap
 from openhexa.sdk import current_run, workspace
 
 
@@ -82,15 +82,27 @@ class PrepareOutputs:
                     csi_buffer_5km=csi_buffer_5km,
                     csi_buffer_15km=csi_buffer_15km,
                     country=country_gpkg,
+                    zone_name=zone_name,
                 )
 
                 pdf_path = district_map.generate()
                 current_run.log_info(f"PDF généré pour {zone_name} : {pdf_path.name}")
 
-            # else:
-            #     region_map = RegionHealthCoverageMap()
-            #     pdf_path = region_map.generate()
-            #     current_run.log_info(f"PDF généré pour {zone_name} : {pdf_path.name}")
+            else:
+                region_map = RegionHealthCoverageMap(
+                    output_dir=folder,
+                    population_coverage=population_coverage,
+                    csi_population_served=csi_population_served,
+                    cs_population_served=cs_population_served,
+                    cs_extension_potential=cs_extension_potential,
+                    extension_areas=extension_areas,
+                    csi_buffer_5km=csi_buffer_5km,
+                    csi_buffer_15km=csi_buffer_15km,
+                    country=country_gpkg,
+                    zone_name=zone_name,
+                )
+                pdf_path = region_map.generate()
+                current_run.log_info(f"PDF généré pour {zone_name} : {pdf_path.name}")
 
     def generate_upload_folders(self):
         """Zip and upload to s3 bucket to make docs accessible through the interface cartesanitaireniger.org."""

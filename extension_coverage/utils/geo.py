@@ -50,7 +50,7 @@ def save_buffered_geom(output_dir: Path, health_facilities: gpd.GeoDataFrame, na
     for dist in buffers:
         # CSI
         gpd.GeoDataFrame(geometry=health_facilities.buffer(dist)).dissolve().to_file(
-            output_dir / f"csi_buffer_{dist // 1000}km.gpkg", driver="GPKG"
+            output_dir / f"{name}_buffer_{dist // 1000}km.gpkg", driver="GPKG"
         )
 
 

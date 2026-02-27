@@ -138,8 +138,8 @@ def process_level_modelling(
     )
 
     outputs.split_files()
-    # boundaries.generate_pdf()
-    # boundaries.generate_upload_folders()
+    outputs.generate_pdf()
+    # outputs.generate_upload_folders()
 
 
 if __name__ == "__main__":

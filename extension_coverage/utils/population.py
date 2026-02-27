@@ -108,12 +108,12 @@ def calculate_population_covered(
 
             column = f"population_covered_{int(distance / 1000)}km"
             coverage[column] = data
-            pop_covered_ratio = coverage[column] / boundaries[column_population_count]
+            pop_covered_ratio = coverage[column] / coverage[column_population_count]
             coverage[f"{column}_ratio"] = pop_covered_ratio
 
     # Save
-    boundaries.to_file(output_dir / "population_coverage.gpkg", driver="GPKG", index=False)
-    pd.DataFrame(boundaries.drop(columns=["geometry"])).to_csv(
+    coverage.to_file(output_dir / "population_coverage.gpkg", driver="GPKG", index=False)
+    pd.DataFrame(coverage.drop(columns=["geometry"])).to_csv(
         path_or_buf=output_dir / "population_coverage.csv", index=False
     )
 

@@ -158,7 +158,8 @@ class BaseHealthCoverageMap:
         output_path: Path
             Path of the generated pdf
         """
-        output_path = self.output_dir / (self.zone_name + "_" + filename)
+        zone_name = self.zone_name.replace(" ", "_").replace("'", "")
+        output_path = self.output_dir / (zone_name + "_" + filename)
         fig.savefig(output_path, format="pdf", bbox_inches="tight")
         plt.close(fig)
         return output_path

@@ -54,15 +54,6 @@ def extension_coverage():
 
     # Modelling
     process_level_modelling(
-        boundaries=regions,
-        geo_dir=geo_dir,
-        population=population_path,
-        csi=csi,
-        cs=cs,
-        output_dir=results_dir,
-        level="region",
-    )
-    process_level_modelling(
         boundaries=districts,
         geo_dir=geo_dir,
         population=population_path,
@@ -70,6 +61,15 @@ def extension_coverage():
         cs=cs,
         output_dir=results_dir,
         level="district",
+    )
+    process_level_modelling(
+        boundaries=regions,
+        geo_dir=geo_dir,
+        population=population_path,
+        csi=csi,
+        cs=cs,
+        output_dir=results_dir,
+        level="region",
     )
 
 
@@ -139,7 +139,7 @@ def process_level_modelling(
 
     outputs.split_files()
     outputs.generate_pdf()
-    # outputs.generate_upload_folders()
+    outputs.generate_upload_folders()
 
 
 if __name__ == "__main__":

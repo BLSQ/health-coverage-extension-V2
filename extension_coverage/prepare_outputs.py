@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+import config
 import geopandas as gpd
 import utils.outputs_dealing as od
 from health_coverage_map import DistrictHealthCoverageMap, RegionHealthCoverageMap
@@ -34,6 +35,8 @@ class PrepareOutputs:
     def __post_init__(self):
         self.unzip = self.output_dir / "unzip"
         self.zip = self.output_dir / "zip"
+        self.pdf = self.output_dir / "PDF"
+        self.zip_pdf = self.output_dir / "zip_PDF"
         self.zone_col = "level_3_name" if self.level == "district" else "level_2_name"
 
         self.unzip.mkdir(parents=True, exist_ok=True)
@@ -106,5 +109,25 @@ class PrepareOutputs:
 
     def generate_upload_folders(self):
         """Zip and upload to s3 bucket to make docs accessible through the interface cartesanitaireniger.org."""
-        od.zip_folder(dir_path=self.unzip, output_dir=self.zip)
-        od.upload_to_s3(folder_path=self.zip)  # NOTE: verifier chemin d'accès + chemin ds s3 !!!!
+        if self.level == "region":
+            od.create_region_pdf_folders(
+                region_district_map=config.region_district_map,
+                regions_path=self.unzip,
+                districts_path=Path(str(self.unzip).replace("region", "district")),
+                output_path=self.pdf,
+            )
+            od.upload_pdf_to_s3(dir_path=self.pdf, level=self.level)
+            od.zip_folder(dir_path=self.pdf, output_dir=self.zip_pdf)
+            od.upload_folder_to_s3(folder_path=self.zip_pdf, level=self.level)
+            od.copy_districts_into_regions(
+                region_district_map=config.region_district_map,
+                regions_path=self.unzip,
+                districts_path=Path(str(self.unzip).replace("region", "district")),
+            )
+            od.zip_folder(dir_path=self.unzip, output_dir=self.zip)
+            od.upload_folder_to_s3(folder_path=self.zip, level=self.level)
+
+        else:
+            od.upload_pdf_to_s3(dir_path=self.unzip, level=self.level)
+            od.zip_folder(dir_path=self.unzip, output_dir=self.zip)
+            od.upload_folder_to_s3(folder_path=self.zip, level=self.level)

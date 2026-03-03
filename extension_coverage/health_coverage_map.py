@@ -4,6 +4,7 @@ from pathlib import Path
 
 import contextily as ctx
 import geopandas as gpd
+import matplotlib.image as mpimg
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -12,6 +13,7 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from matplotlib_scalebar.scalebar import ScaleBar
+from openhexa.sdk import workspace
 from shapely.geometry import box
 
 
@@ -98,7 +100,15 @@ class BaseHealthCoverageMap:
         ax_table: Axes
         """
         fig = plt.figure(figsize=(10, 12))
-        gs = fig.add_gridspec(nrows=3, ncols=1, height_ratios=[0.01, 6, 1.7 - self.table_is_empty])
+        gs = fig.add_gridspec(nrows=3, ncols=1, height_ratios=[0.95, 6, 1.7 - self.table_is_empty])
+
+        ax_logo = fig.add_subplot(gs[0])
+        ax_logo.axis("off")
+        logo_path = Path(workspace.files_path) / "logo.png"
+        logo_img = mpimg.imread(logo_path)
+        ax_logo.imshow(logo_img)
+        ax_logo.set_aspect("auto")
+
         ax_blank = fig.add_subplot(gs[0])
         ax_blank.axis("off")
         ax_map = fig.add_subplot(gs[1])
@@ -310,7 +320,9 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
                 label="CS (impact faible)",
             ),
         ]
-        ax.legend(handles=legend_elements, loc="best", fontsize=8, frameon=True)
+        ax.legend(
+            handles=legend_elements, loc="lower center", fontsize=8, frameon=True, ncol=2, bbox_to_anchor=(0.5, -0.1)
+        )
 
         # scale
         scalebar = ScaleBar(
@@ -485,7 +497,9 @@ class RegionHealthCoverageMap(BaseHealthCoverageMap):
                 label="CS (impact élevé)",
             ),
         ]
-        ax.legend(handles=legend_elements, loc="best", fontsize=8, frameon=True)
+        ax.legend(
+            handles=legend_elements, loc="lower center", fontsize=8, frameon=True, ncol=2, bbox_to_anchor=(0.5, -0.1)
+        )
 
         # scale
         scalebar = ScaleBar(

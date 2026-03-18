@@ -8,7 +8,7 @@ from openhexa.sdk import current_run, pipeline, workspace
 from prepare_outputs import PrepareOutputs
 
 
-@pipeline("extension_coverage")
+@pipeline("extension_coverage", timeout=21600)
 def extension_coverage():
     """Compute health service coverage and identify potential extension areas.
 

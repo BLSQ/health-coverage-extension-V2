@@ -324,7 +324,7 @@ def generate_priority_areas(
 
 
 def population_served_per_fosa(
-    fosa: gpd.GeoDataFrame, population_served_raster: Path, output_dir: Path, file_name: str
+    fosa: gpd.GeoDataFrame, population_served_raster: Path, column: str, output_dir: Path, file_name: str
 ) -> pd.Series:
     """Get population served for each FOSA per area.
 
@@ -334,6 +334,8 @@ def population_served_per_fosa(
         Geodataframe with FOSAs.
     population_served_raster : Path
         Path to population served raster.
+    column: str
+        name of the column where will be saved population values.
     output_dir: Path
         Output directory path.
     file_name: str
@@ -368,7 +370,9 @@ def population_served_per_fosa(
         else:
             fosa_pop_served.loc[index] = None
 
-    fosa.to_file(output_dir / f"{file_name}.gpkg", driver="GPKG")
-    pd.DataFrame(fosa.drop(columns=["geometry"])).to_csv(path_or_buf=output_dir / f"{file_name}.csv", index=False)
+    fosa_[column] = fosa_pop_served
 
-    return fosa_pop_served
+    fosa_.to_file(output_dir / f"{file_name}.gpkg", driver="GPKG")
+    pd.DataFrame(fosa_.drop(columns=["geometry"])).to_csv(path_or_buf=output_dir / f"{file_name}.csv", index=False)
+
+    return fosa_

@@ -107,16 +107,21 @@ class Modelling:
         )
 
         current_run.log_info("Calcule la population desservie par chaque CSI...")
-        self.csi_[self.column] = pop.population_served_per_fosa(
+        self.csi_ = pop.population_served_per_fosa(
             fosa=self.csi,
             population_served_raster=served,
+            column=self.column,
             output_dir=self.calculs_dir,
             file_name="csi_population_served",
         )
 
         current_run.log_info("Calcule la population desservie par chaque CS...")
-        self.cs_[self.column] = pop.population_served_per_fosa(
-            fosa=self.cs, population_served_raster=served, output_dir=self.calculs_dir, file_name="cs_population_served"
+        self.cs_ = pop.population_served_per_fosa(
+            fosa=self.cs,
+            population_served_raster=served,
+            column=self.column,
+            output_dir=self.calculs_dir,
+            file_name="cs_population_served",
         )
 
     def extension_computing(self):

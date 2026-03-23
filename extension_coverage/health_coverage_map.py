@@ -216,7 +216,7 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
         self.population_coverage.boundary.plot(ax=ax, color="black", linewidth=1)
 
         outside_country.plot(ax=ax, facecolor="none", edgecolor="lightgrey", hatch="////", linewidth=0)
-        outside_popcov.plot(ax=ax, color="white", alpha=0.7)
+        outside_popcov.plot(ax=ax, color="white", alpha=0.7, zorder=1)
 
         # buffers
         self.csi_buffer_15km.plot(ax=ax, color="#e7b419", alpha=0.2, edgecolor="#ca9d16")
@@ -236,7 +236,7 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
                 text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
 
         # points
-        self.csi_population_served.plot(ax=ax, color="#cc0000", markersize=50, edgecolor="#000000")
+        self.csi_population_served.plot(ax=ax, color="#cc0000", markersize=50, edgecolor="#000000", zorder=2)
         for x, y, label in zip(
             self.csi_population_served.geometry.x,
             self.csi_population_served.geometry.y,
@@ -247,7 +247,7 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
             text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
 
         if not self.cs_population_served.empty:  # like the case for Niamey & Maradi Ville
-            self.cs_population_served.plot(ax=ax, color="#0077fe", markersize=50, edgecolor="#000000")
+            self.cs_population_served.plot(ax=ax, color="#0077fe", markersize=50, edgecolor="#000000", zorder=3)
 
         if not self.table_is_empty:
             self.cs_extension_potential.plot(ax=ax, color="#54b252", markersize=50, edgecolor="#000000")
@@ -279,6 +279,7 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
             va="bottom",
             fontsize=15,
         )
+        ax.text(0.5, 1.05, "Source : WorldPop", transform=ax.transAxes, ha="center", va="bottom", fontsize=10)
         ax.axis("off")
 
         # legend
@@ -428,7 +429,7 @@ class RegionHealthCoverageMap(BaseHealthCoverageMap):
         self.population_coverage.boundary.plot(ax=ax, color="black", linewidth=1)
 
         outside_country.plot(ax=ax, facecolor="none", edgecolor="lightgrey", hatch="////", linewidth=0)
-        outside_popcov.plot(ax=ax, color="white", alpha=0.7)
+        outside_popcov.plot(ax=ax, color="white", alpha=0.7, zorder=1)
 
         # buffers
         self.csi_buffer_15km.plot(ax=ax, color="#e7b419", alpha=0.2, edgecolor="#ca9d16")
@@ -449,8 +450,8 @@ class RegionHealthCoverageMap(BaseHealthCoverageMap):
 
         # points
         if not self.table_is_empty:
-            self.cs_extension_potential.plot(ax=ax, color="#54b252", markersize=50, edgecolor="#000000")
-        self.csi_population_served.plot(ax=ax, color="#cc0000", markersize=50, edgecolor="#000000")
+            self.cs_extension_potential.plot(ax=ax, color="#54b252", markersize=50, edgecolor="#000000", zorder=3)
+        self.csi_population_served.plot(ax=ax, color="#cc0000", markersize=50, edgecolor="#000000", zorder=2)
 
         ax.set_title(
             f"{self.population_coverage.level_2_name[0]}",
@@ -467,6 +468,7 @@ class RegionHealthCoverageMap(BaseHealthCoverageMap):
             va="bottom",
             fontsize=15,
         )
+        ax.text(0.5, 1.05, "Source : WorldPop", transform=ax.transAxes, ha="center", va="bottom", fontsize=10)
         ax.axis("off")
 
         # legend

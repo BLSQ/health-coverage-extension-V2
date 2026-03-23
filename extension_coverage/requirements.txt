@@ -1,2 +1,6 @@
+contextily
 fsspec
+matplotlib_scalebar
 opencv-python
+rasterstats
+s3fs

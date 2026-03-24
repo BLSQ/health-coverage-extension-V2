@@ -65,9 +65,9 @@ Les cases de santé susceptibles d’être converties en CSI sont identifiées s
 
 ## Paramètres de modélisation
 
-* Distance minimale au CSI : la distance minimum requise à n'importe quel CSI existant pour qu'une zone ou case de santé puisse être considérée pour une extension (defaut = 15 000 m)
-* Distance desservie : rayon autour duquel la population est considérée comme desservie (defaut = 5 000 m)
-* Population desservie minimale : population minimale requise pour qu'une zone ou case de santé soit considérée pour une extension (defaut : 5 000 habitants)
+* Distance minimale au CSI : distance (en mètres) minimale requise à un CSI existant pour considérer une nouvelle implantation ou une reconversion d'une CS (défaut : 15 000 m).
+* Distance desservie : rayon autour duquel la population est considérée comme desservie (défaut = 5 000 m)
+* Population desservie minimale : population minimale requise pour qu'une case de santé soit considérée pour une promotion en CSI (défaut : 5 000 habitants)
 
 ## Visualisation et téléchargement des résultats
 

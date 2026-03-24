@@ -29,9 +29,9 @@ class Modelling:
         Level of interest (regions or districts) (mostly used for log messages)
     distances: list[int] | None = None
         List of distances (in m) used to calculate current health coverage
-    max_distance_served: int = 5000
+    max_distance_served:
         Radius within which the population is considered to be served.
-    min_distance_from_csi: int = 15000
+    min_distance_from_csi:
         Minimum distance required from any existing CSI for a health zone or box to be considered for extension
     """
 

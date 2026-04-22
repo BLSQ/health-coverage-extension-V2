@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from pathlib import Path
 
 import config
@@ -8,7 +7,6 @@ from health_coverage_map import DistrictHealthCoverageMap, RegionHealthCoverageM
 from openhexa.sdk import current_run, workspace
 
 
-@dataclass
 class PrepareOutputs:
     """Prepare outputs to be uploaded into s3 bucket.
 
@@ -32,12 +30,29 @@ class PrepareOutputs:
     boundaries: gpd.GeoDataFrame
     level: str
 
-    def __post_init__(self):
+    def __init__(
+        self,
+        input_dir: Path,
+        geo_dir: Path,
+        output_dir: Path,
+        boundaries: gpd.GeoDataFrame,
+        level: str,
+    ):
+        self.input_dir = input_dir
+        self.geo_dir = geo_dir
+        self.output_dir = output_dir
+        self.boundaries = boundaries.copy()
+        self.level = level
+
+        self.zone_col = "level_3_name" if self.level == "district" else "level_2_name"
+        self._setup_directories()
+
+    def _setup_directories(self):
+        """Create required directory structure."""
         self.unzip = self.output_dir / "unzip"
         self.zip = self.output_dir / "zip"
         self.pdf = self.output_dir / "PDF"
         self.zip_pdf = self.output_dir / "zip_PDF"
-        self.zone_col = "level_3_name" if self.level == "district" else "level_2_name"
 
         self.unzip.mkdir(parents=True, exist_ok=True)
         self.zip.mkdir(parents=True, exist_ok=True)
@@ -75,7 +90,7 @@ class PrepareOutputs:
             csi_buffer_15km = gpd.read_file(buffer_dir / "csi_buffer_15km.gpkg")
 
             if self.level == "district":
-                district_map = DistrictHealthCoverageMap(
+                map_obj = DistrictHealthCoverageMap(
                     output_dir=folder,
                     population_coverage=population_coverage,
                     csi_population_served=csi_population_served,
@@ -87,12 +102,8 @@ class PrepareOutputs:
                     country=country_gpkg,
                     zone_name=zone_name,
                 )
-
-                pdf_path = district_map.generate()
-                current_run.log_info(f"PDF généré pour {zone_name} : {pdf_path.name}")
-
             else:
-                region_map = RegionHealthCoverageMap(
+                map_obj = RegionHealthCoverageMap(
                     output_dir=folder,
                     population_coverage=population_coverage,
                     csi_population_served=csi_population_served,
@@ -104,8 +115,8 @@ class PrepareOutputs:
                     country=country_gpkg,
                     zone_name=zone_name,
                 )
-                pdf_path = region_map.generate()
-                current_run.log_info(f"PDF généré pour {zone_name} : {pdf_path.name}")
+            pdf_path = map_obj.generate()
+            current_run.log_info(f"PDF généré pour {zone_name} : {pdf_path.name}")
 
     def generate_upload_folders(self):
         """Zip and upload to s3 bucket to make docs accessible through the interface cartesanitaireniger.org."""

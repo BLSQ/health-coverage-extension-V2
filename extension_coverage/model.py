@@ -1,4 +1,3 @@
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import config
@@ -9,8 +8,7 @@ import utils.population as pop
 from openhexa.sdk import current_run
 
 
-@dataclass
-class Modelling:
+class CoverageAnalysisPipeline:
     """Compute everything related to population. Then analyse and produce extension areas outputs.
 
     Attributes
@@ -27,36 +25,47 @@ class Modelling:
         Locations of CS facilities.
     level: str
         Level of interest (regions or districts) (mostly used for log messages)
-    distances: list[int] | None = None
-        List of distances (in m) used to calculate current health coverage
-    max_distance_served:
-        Radius within which the population is considered to be served.
-    min_distance_from_csi:
-        Minimum distance required from any existing CSI for a health zone or box to be considered for extension
     """
 
-    output_dir: Path
-    boundaries: gpd.GeoDataFrame
-    population: Path
-    csi: gpd.GeoDataFrame
-    cs: gpd.GeoDataFrame
-    level: str
-    distances: list[int] = field(default_factory=lambda: config.distances)
-    max_distance_served: int = field(default_factory=lambda: config.max_distance_served)
-    min_distance_from_csi: int = field(default_factory=lambda: config.min_distance_from_csi)
+    def __init__(
+        self,
+        output_dir: Path,
+        boundaries: gpd.GeoDataFrame,
+        population: Path,
+        csi: gpd.GeoDataFrame,
+        cs: gpd.GeoDataFrame,
+        level: str,
+    ):
+        self.output_dir = output_dir
+        self.boundaries = boundaries.copy()
+        self.population = population
+        self.csi = csi.copy()
+        self.cs = cs.copy()
+        self.level = level
 
-    def __post_init__(self):
+        self.distances = config.distances
+        self.max_distance_served = config.max_distance_served
+        self.min_distance_from_csi = config.min_distance_from_csi
+
         self.column = f"population_{int(self.max_distance_served / 1000)}km"
+
         self.boundaries_ = self.boundaries.copy()
         self.csi_ = self.csi.copy()
         self.cs_ = self.cs.copy()
 
+        self._setup_directories()
+
+        self.population_served = self.intermediate_dir / "population_served.tif"
+        self.priority_areas = self.intermediate_dir / "priority_areas.tif"
+        self._population_computed = False
+
+    def _setup_directories(self):
+        """Create required directory structure."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
         self.tiles_dir = self.output_dir / "tiles"
         self.calculs_dir = self.output_dir / "calculs"
         self.intermediate_dir = self.output_dir / "intermediate"
-        self.population_served = self.intermediate_dir / "population_served.tif"
-        self.priority_areas = self.intermediate_dir / "priority_areas.tif"
 
         self.tiles_dir.mkdir(parents=True, exist_ok=True)
         self.calculs_dir.mkdir(parents=True, exist_ok=True)
@@ -124,6 +133,8 @@ class Modelling:
             file_name="cs_population_served",
         )
 
+        self._population_computed = True
+
     def extension_computing(self):
         """Perform extension potential analysis based on previously computed coverage outputs.
 
@@ -139,6 +150,9 @@ class Modelling:
         - Minimum population thresholds and analysis parameters are defined
         in the `config` module.
         """
+        if not self._population_computed:
+            raise RuntimeError("population_computing() must be run first")
+
         current_run.log_info("Analyse les zones potentielles d'extension...")
         analysis.analyse_potential_areas(
             priority_areas=self.priority_areas,

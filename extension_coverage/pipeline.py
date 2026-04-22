@@ -3,7 +3,7 @@ from pathlib import Path
 import config
 import geopandas as gpd
 import utils.geo as geo
-from model import Modelling
+from model import CoverageAnalysisPipeline
 from openhexa.sdk import current_run, pipeline, workspace
 from prepare_outputs import PrepareOutputs
 
@@ -31,13 +31,9 @@ def extension_coverage():
     - Upload zipped folder into s3 bucket
     """
     org_unit_dir = Path(workspace.files_path) / "organisation_units"
-
-    # Load org units
     cs = gpd.read_file(org_unit_dir / "CS.gpkg")
     csi = gpd.read_file(org_unit_dir / "CSI.gpkg")
     districts = gpd.read_file(org_unit_dir / "shapes_level3.gpkg")
-
-    # Population path
     population_path = Path(workspace.files_path) / "population/population.tif"
 
     # Dirs def
@@ -48,7 +44,6 @@ def extension_coverage():
 
     # Prepare geospatial stuff
     regions = geo.merge_districts(df_shapes=districts, output_dir=geo_dir)
-
     geo.save_buffered_geom(output_dir=geo_dir, health_facilities=csi, name="csi", buffers=config.buffers)
     geo.save_buffered_geom(output_dir=geo_dir, health_facilities=cs, name="cs", buffers=config.buffers)
 
@@ -113,7 +108,7 @@ def process_level_modelling(
     """
     dst_dir = output_dir / level
 
-    model = Modelling(
+    model = CoverageAnalysisPipeline(
         output_dir=dst_dir,
         boundaries=boundaries,
         population=population,
@@ -139,7 +134,7 @@ def process_level_modelling(
 
     outputs.split_files()
     outputs.generate_pdf()
-    outputs.generate_upload_folders()
+    # outputs.generate_upload_folders()
 
 
 if __name__ == "__main__":

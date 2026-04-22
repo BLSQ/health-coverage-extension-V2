@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import geopandas as gpd
 import numpy as np
@@ -8,7 +9,7 @@ from openhexa.sdk import current_run
 
 
 def merge_districts(df_shapes: gpd.GeoDataFrame, output_dir: Path) -> gpd.GeoDataFrame:
-    """Merge all geometries of districts to get national boundaries.
+    """Merge all geometries of districts to get regional and national boundaries.
 
     Parameter
     ---------
@@ -31,7 +32,7 @@ def merge_districts(df_shapes: gpd.GeoDataFrame, output_dir: Path) -> gpd.GeoDat
     return regions
 
 
-def save_buffered_geom(output_dir: Path, health_facilities: gpd.GeoDataFrame, name: str, buffers: list):
+def save_buffered_geom(output_dir: Path, health_facilities: gpd.GeoDataFrame, name: str, buffers: list[int]):
     """Add buffer(s) around geometry.
 
     Parameters
@@ -54,7 +55,9 @@ def save_buffered_geom(output_dir: Path, health_facilities: gpd.GeoDataFrame, na
         )
 
 
-def split_raster(raster: Path, boundaries: gpd.GeoDataFrame, level: str, output_dir: Path) -> None:
+def split_raster(
+    raster: Path, boundaries: gpd.GeoDataFrame, level: Literal["region", "district"], output_dir: Path
+) -> None:
     """Split population raster per area.
 
     The function split the input population raster into multiple tiles (one per area). This is to avoid

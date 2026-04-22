@@ -6,7 +6,7 @@ Ce module permet d’automatiser le calcul d’un ensemble de métriques et d’
 * Repérer les cases de santé pouvant être converties en CSI pour améliorer l’accès aux soins
 * Mettre en évidence les CSI susceptibles d’être surchargés au regard de la population desservie
 
-Les résultats de l'analyse sont consultables et téléchargeable depuis l'interface de la [carte sanitaire du Niger](https://www.cartesanitaireniger.org/#/reports).
+Les résultats de l'analyse sont consultables et téléchargeables depuis l'interface de la [carte sanitaire du Niger](https://www.cartesanitaireniger.org/#/reports).
 
 ## Principe
 

@@ -6,6 +6,8 @@ Ce module permet d’automatiser le calcul d’un ensemble de métriques et d’
 * Repérer les cases de santé pouvant être converties en CSI pour améliorer l’accès aux soins
 * Mettre en évidence les CSI susceptibles d’être surchargés au regard de la population desservie
 
+Les résultats de l'analyse sont consultables et téléchargeables depuis l'interface de la [carte sanitaire du Niger](https://www.cartesanitaireniger.org/#/reports).
+
 ## Principe
 
 Le module combine plusieurs sources de données :
@@ -18,7 +20,7 @@ Le module combine plusieurs sources de données :
  - les populations insuffisamment desservies,
  - les priorités géographiques pour l’extension de la couverture sanitaire.
 
-Les analyses sont réalisées à l’échelle de chaque district, afin de produire des résultats directement exploitables.
+Les analyses sont réalisées à l’échelle de chaque district et des régions, afin de produire des résultats directement exploitables.
 
 ## Données d'entrée
 
@@ -30,7 +32,7 @@ Les données de distribution de la **population** sont nécessaires pour estimer
 
 ### Districts
 
-Les districts sont l'unité d'aggregation principale du module d'analyse : l'ensemble des statistiques sont calculées de manière indépendente et isolée pour chaque district.
+Les districts sont l'unité d'aggregation principale du module d'analyse : l'ensemble des statistiques sont calculées de manière indépendente et isolée pour chaque district. Les résultats générés au niveau des régions utilisent les géométries aggrégées des districts fils. 
 
 Le fichier de district est téléchargé automatiquement depuis une instance DHIS2. 
 
@@ -63,16 +65,19 @@ Les cases de santé susceptibles d’être converties en CSI sont identifiées s
 
 ## Paramètres de modélisation
 
-* Distance minimale au CSI : la distance minimum requise à n'importe quel CSI existant pour qu'une zone ou case de santé puisse être considérée pour une extension (defaut = 15 000 m)
-* Distance desservie : rayon autour duquel la population est considérée comme desservie (defaut = 5 000 m)
-* Population desservie minimale : population minimale requise pour qu'une zone ou case de santé soit considérée pour une extension (defaut : 5 000 habitants)
+* Distance minimale au CSI : distance (en mètres) minimale requise à un CSI existant pour considérer une nouvelle implantation ou une reconversion d'une CS (défaut : 15 000 m).
+* Distance desservie : rayon autour duquel la population est considérée comme desservie (défaut = 5 000 m)
+* Population desservie minimale : population minimale requise pour qu'une case de santé soit considérée pour une promotion en CSI (défaut : 5 000 habitants)
 
 ## Visualisation et téléchargement des résultats
 
-Les résultats de la modélisation peuvent être téléchargés depuis l'interface de la carte sanitaire du Niger, dans l'onglet [Atlas d'accessibilité](https://www.cartesanitaireniger.org/#/reports). Ils peuvent être filtrés par région et district. 
+Les résultats de la modélisation peuvent être téléchargés depuis l'interface de la carte sanitaire du Niger, dans l'onglet [Atlas d'accessibilité](https://www.cartesanitaireniger.org/#/reports). Ils peuvent être filtrés par région et district, ainsi que par détail (soit seulement le fichier PDF, soit un dossier contenant tous les fichiers de sortie).
 
 ## Fichiers de sortie
 
+* Résumé de l'analyse :
+    * `xxx_carte_couverture_sanitaire.pdf`
+    Fichier PDF regroupant les principaux résultats de l'analyse (population totale et desservie, carte, CS à potentielle conversion) et correspond à l'atlas s'il était généré via QGIS. 
 * Résultats de l'analyse :
     * `extension_areas.gpkg`  
     Zones d'extension potentielles (géométries, population desservie, distance au CSI le plus proche).

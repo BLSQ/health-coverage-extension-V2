@@ -103,8 +103,8 @@ def process_level_modelling(
 
     Notes
     -----
-    This function acts as a high-level orchestrator and delegates computation and output generation to the `Modelling`
-    and `PrepareOutputs` classes.
+    This function acts as a high-level orchestrator and delegates computation and output
+    generation to the `CoverageAnalysisPipeline` and `PrepareOutputs` classes.
     """
     dst_dir = output_dir / level
 
@@ -134,7 +134,7 @@ def process_level_modelling(
 
     outputs.split_files()
     outputs.generate_pdf()
-    # outputs.generate_upload_folders()
+    outputs.generate_upload_folders()
 
 
 if __name__ == "__main__":

@@ -183,14 +183,15 @@ class BaseHealthCoverageMap:
 
     def _plot_extension_areas(self, ax: Axes):
         if not self.extension_areas.empty:
-            self.extension_areas.plot(ax=ax, color="#ff0004", edgecolor="#a4181a")
+            self.extension_areas.plot(ax=ax, color="#ff0004", alpha=0.3, edgecolor="#a4181a")
+            self.extension_areas.boundary.plot(ax=ax, color="#a4181a", linewidth=1)
             for x, y, pop in zip(
                 self.extension_areas.geometry.centroid.x,
                 self.extension_areas.geometry.centroid.y,
                 self.extension_areas.max_population_served,
                 strict=False,
             ):
-                label = f"+{pop}"
+                label = f"+{pop}\n(+{round(100 * pop / int(self.population_coverage.population_total.iloc[0]), 2)}%)"
                 text = ax.annotate(label, xy=(x, y), fontsize=9, color="#610023")
                 text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
 
@@ -214,7 +215,7 @@ class BaseHealthCoverageMap:
         elements = [
             Patch(facecolor="#b2df8a", edgecolor="#33a02c", alpha=0.75, label="Zone desservie (5 km)"),
             Patch(facecolor="#e7b419", edgecolor="#ca9d16", alpha=0.45, label="Zone desservie (15 km)"),
-            Patch(facecolor="#ff0004", edgecolor="#a4181a", label="Zone sans CS"),
+            Patch(facecolor="#ff0004", edgecolor="#a4181a", alpha=0.45, label="Zone sans CS"),
             Line2D(
                 [0],
                 [0],
@@ -375,8 +376,8 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
         if not self.cs_population_served.empty:  # like the case for Niamey & Maradi Ville
             self.cs_population_served.plot(ax=ax, color="#0077fe", markersize=50, edgecolor="#000000", zorder=3)
 
-        if not self.table_is_empty:
-            self.cs_extension_potential.plot(ax=ax, color="#54b252", markersize=50, edgecolor="#000000")
+        if not self.cs_extension_potential.empty:  # self.table_is_empty:
+            self.cs_extension_potential.plot(ax=ax, color="#54b252", markersize=50, edgecolor="#000000", zorder=4)
             for x, y, name, pop in zip(
                 self.cs_extension_potential.geometry.x,
                 self.cs_extension_potential.geometry.y,
@@ -403,8 +404,8 @@ class DistrictHealthCoverageMap(BaseHealthCoverageMap):
         self.add_basemap_with_retry(ax)
         self._plot_countours(ax, outside_country, outside_popcov)
         self._plot_buffers(ax)
-        self._plot_extension_areas(ax)
         self._plot_facilities(ax)
+        self._plot_extension_areas(ax)
 
         self._add_titles(ax, f"{self.population_coverage.level_3_name[0]}, {self.population_coverage.level_2_name[0]}")
         self._add_scalebar_legend(ax, "district")
@@ -446,7 +447,6 @@ class RegionHealthCoverageMap(BaseHealthCoverageMap):
         self.add_basemap_with_retry(ax)
         self._plot_countours(ax, outside_country, outside_popcov)
         self._plot_buffers(ax)
-        self._plot_extension_areas(ax)
 
         # points
         if not self.table_is_empty:
@@ -456,3 +456,5 @@ class RegionHealthCoverageMap(BaseHealthCoverageMap):
         self._add_titles(ax, f"{self.population_coverage.level_2_name[0]}")
         self._add_scalebar_legend(ax, "region")
         plt.tight_layout()
+
+        self._plot_extension_areas(ax)

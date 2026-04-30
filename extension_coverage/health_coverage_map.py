@@ -191,7 +191,7 @@ class BaseHealthCoverageMap:
                 self.extension_areas.max_population_served,
                 strict=False,
             ):
-                label = f"+{pop}\n(+{round(100 * pop / int(self.population_coverage.population_total.iloc[0]), 2)}%)"
+                label = f"+{pop} (+{round(100 * pop / int(self.population_coverage.population_total.iloc[0]), 2)}%)"
                 text = ax.annotate(label, xy=(x, y), fontsize=9, color="#610023")
                 text.set_path_effects([pe.withStroke(linewidth=2, foreground="#fafafa")])
 

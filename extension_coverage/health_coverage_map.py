@@ -164,7 +164,12 @@ class BaseHealthCoverageMap:
         for attempt in range(retries):
             try:
                 ctx.add_basemap(
-                    ax, source=ctx.providers.OpenStreetMap.Mapnik, crs=self.population_coverage.crs.to_string()
+                    ax,
+                    source=ctx.providers.OpenStreetMap.Mapnik,
+                    crs=self.population_coverage.crs.to_string(),
+                    headers={
+                        "User-Agent": "NER Enabel (+https://www.bluesquarehub.com/; contact: belgium.info@bluesquarehub.com)"
+                    },
                 )
                 return True
             except Exception as e:

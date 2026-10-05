@@ -312,7 +312,7 @@ class BaseHealthCoverageMap:
 
         table = ax_table.table(
             cellText=table.values,
-            colLabels=["DHIS2 UID", "Nom", "Population desservie", "Impact", "Distance CSI"],
+            colLabels=["DHIS2 UID", "Nom", "Population desservie", "Impact", "CSI le plus proche"],
             cellLoc="center",
             colLoc="center",
             loc="center",

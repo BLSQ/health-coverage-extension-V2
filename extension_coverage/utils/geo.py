@@ -24,7 +24,7 @@ def merge_districts(df_shapes: gpd.GeoDataFrame, output_dir: Path) -> gpd.GeoDat
         Geodataframe of regions
     """
     country = gpd.GeoDataFrame(geometry=[df_shapes.geometry.union_all()], crs=df_shapes.crs)
-    regions = df_shapes.dissolve("level_2_name", as_index=False).drop(columns=["level_3_name", "level_3_id"], axis=1)
+    regions = df_shapes.dissolve("level_2_name", as_index=False).drop(columns=["level_3_name", "level_3_id"])
 
     country.to_file(output_dir / "country.gpkg", driver="GPKG")
     regions.to_file(output_dir / "regions.gpkg", driver="GPKG")
